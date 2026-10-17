@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: nova-commerce
+    env: docker
+    plan: free
+    region: frankfurt
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_KEY
+        value: base64:RUwcytlATvDL5FdmOixilfa0AsiOJpxOsPa2MCO4g1E=
+      - key: DB_CONNECTION
+        value: sqlite
