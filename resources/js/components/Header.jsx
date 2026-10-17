@@ -16,6 +16,7 @@ export default function Header({
 }) {
     const titles = {
         dashboard: { title: 'لوحة التحكم والمؤشرات', breadcrumb: 'الرئيسية / المؤشرات' },
+        orders: { title: 'إدارة طلبات المتجر والمبيعات', breadcrumb: 'الرئيسية / الطلبات' },
         products: { title: 'كتالوج المنتجات والمخزون', breadcrumb: 'الرئيسية / المنتجات' },
         categories: { title: 'إدارة وتصنيف الكتالوج', breadcrumb: 'الرئيسية / التصنيفات' },
         security_lab: { title: 'مختبر الأمان وعزل المتاجر', breadcrumb: 'الأمان / Multi-Tenancy' }

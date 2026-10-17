@@ -12,7 +12,8 @@ export default function CheckoutModal({
     clearCart,
     currentTenant,
     currentUser,
-    showToast
+    showToast,
+    apiCall
 }) {
     const [step, setStep] = useState(1); // 1: Shipping & Customer, 2: Payment, 3: Success
     const [name, setName] = useState(currentUser?.name || '');
@@ -54,37 +55,92 @@ export default function CheckoutModal({
         setStep(2);
     };
 
-    const handleConfirmOrder = () => {
+    const handleConfirmOrder = async () => {
+        if (!cart || cart.length === 0) {
+            showToast?.('سلة المشتريات فارغة!', 'error');
+            return;
+        }
+
         setIsSubmitting(true);
 
-        setTimeout(() => {
-            const orderRef = 'NOVA-' + Math.floor(100000 + Math.random() * 900000);
-            const orderData = {
-                orderRef,
-                date: new Date().toLocaleDateString('ar-SA'),
-                customer: { name, phone, email, city, address, notes },
-                items: [...cart],
-                subtotal,
-                shippingFee,
-                grandTotal,
-                paymentMethod,
-                tenant: currentTenant?.name || 'متجر نوفا'
-            };
+        const slug = currentTenant?.slug || 'demo-store';
+        const payload = {
+            customer_name: name.trim(),
+            customer_phone: phone.trim(),
+            customer_email: email.trim() ? email.trim() : null,
+            shipping_city: city,
+            shipping_address: address.trim(),
+            shipping_notes: notes.trim() ? notes.trim() : null,
+            payment_method: paymentMethod,
+            items: cart.map(item => ({
+                product_id: item.id,
+                quantity: item.qty,
+                variant_id: item.variant_id || null,
+            })),
+            notes: notes.trim() ? notes.trim() : null,
+        };
 
-            // Save order to local storage for customer account view
-            try {
-                const existingOrders = JSON.parse(localStorage.getItem('nova_customer_orders')) || [];
-                localStorage.setItem('nova_customer_orders', JSON.stringify([orderData, ...existingOrders]));
-            } catch (e) {
-                console.error(e);
+        try {
+            const res = apiCall
+                ? await apiCall(`/api/v1/storefront/${slug}/checkout`, {
+                    method: 'POST',
+                    body: payload
+                })
+                : await fetch(`/api/v1/storefront/${slug}/checkout`, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload)
+                }).then(r => r.json().then(data => ({ status: r.status, data })));
+
+            if (res.status === 201 || res.status === 200) {
+                const orderData = res.data?.data;
+                const formattedOrder = {
+                    id: orderData?.id,
+                    orderRef: orderData?.order_number || ('NOVA-' + (orderData?.id || Math.floor(100000 + Math.random() * 900000))),
+                    date: new Date().toLocaleDateString('ar-SA'),
+                    customer: {
+                        name: orderData?.customer?.name || name,
+                        phone: orderData?.customer?.phone || phone,
+                        email: orderData?.customer?.email || email,
+                        city: orderData?.shipping?.city || city,
+                        address: orderData?.shipping?.address || address,
+                        notes: orderData?.shipping?.notes || notes
+                    },
+                    items: orderData?.items?.length ? orderData.items : [...cart],
+                    subtotal: orderData?.financials?.subtotal ?? subtotal,
+                    shippingFee: orderData?.financials?.shipping_fee ?? shippingFee,
+                    grandTotal: orderData?.financials?.total ?? grandTotal,
+                    paymentMethod: orderData?.payment?.method || paymentMethod,
+                    tenant: orderData?.tenant?.name || currentTenant?.name || 'متجر نوفا'
+                };
+
+                // Save order to local storage for customer account offline fallback
+                try {
+                    const existingOrders = JSON.parse(localStorage.getItem('nova_customer_orders')) || [];
+                    localStorage.setItem('nova_customer_orders', JSON.stringify([formattedOrder, ...existingOrders]));
+                } catch (e) {
+                    console.error(e);
+                }
+
+                setCompletedOrder(formattedOrder);
+                clearCart?.();
+                setStep(3);
+                showToast?.('تم تأكيد طلبك بنجاح!', 'success');
+            } else {
+                const errMsg = res.data?.errors
+                    ? Object.values(res.data.errors).flat().join(' | ')
+                    : (res.data?.message || 'فشل إتمام الطلب، يرجى التأكد من توفر المخزون.');
+                showToast?.(errMsg, 'error', 'خطأ في الطلب');
             }
-
-            setCompletedOrder(orderData);
-            clearCart?.();
+        } catch (err) {
+            console.error('Checkout error:', err);
+            showToast?.('حدث خطأ في الاتصال بالخادم، يرجى المحاولة مرة أخرى.', 'error');
+        } finally {
             setIsSubmitting(false);
-            setStep(3);
-            showToast?.('تم تأكيد طلبك بنجاح!', 'success');
-        }, 1200);
+        }
     };
 
     const handleClose = () => {

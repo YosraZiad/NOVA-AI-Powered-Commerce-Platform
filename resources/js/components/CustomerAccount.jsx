@@ -12,7 +12,8 @@ export default function CustomerAccount({
     onLogout,
     onNavigate,
     setIsCartOpen,
-    setIsAuthModalOpen
+    setIsAuthModalOpen,
+    apiCall
 }) {
     const [orders, setOrders] = React.useState(() => {
         try {
@@ -21,6 +22,31 @@ export default function CustomerAccount({
             return [];
         }
     });
+    const [loadingOrders, setLoadingOrders] = React.useState(false);
+
+    // Fetch real authenticated customer orders from API
+    React.useEffect(() => {
+        if (!currentUser || !apiCall) return;
+
+        const fetchCustomerOrders = async () => {
+            setLoadingOrders(true);
+            try {
+                const res = await apiCall('/api/v1/account/orders');
+                if (res.status === 200 && res.data?.data) {
+                    // If server has orders, update list
+                    if (res.data.data.length > 0) {
+                        setOrders(res.data.data);
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to load customer orders from API:', err);
+            } finally {
+                setLoadingOrders(false);
+            }
+        };
+
+        fetchCustomerOrders();
+    }, [currentUser]);
 
     const currency = currentTenant?.currency || 'SAR';
     const totalCartItems = cart.reduce((sum, item) => sum + item.qty, 0);
@@ -252,66 +278,101 @@ export default function CustomerAccount({
                     </div>
                 ) : (
                     <div className="space-y-4">
-                        {orders.map((ord, idx) => (
-                            <div
-                                key={ord.orderRef || idx}
-                                className="bg-slate-50 border border-slate-200/90 rounded-2xl p-4 sm:p-5 space-y-3 text-right"
-                            >
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/70 pb-3">
-                                    <div className="flex items-center gap-2.5">
-                                        <span className="font-mono font-black text-xs text-slate-900 bg-white border border-slate-200 px-2.5 py-1 rounded-lg">
-                                            {ord.orderRef}
-                                        </span>
-                                        <span className="text-xs text-slate-500">{ord.date}</span>
-                                        <span className="text-xs font-bold text-emerald-800 bg-emerald-100/70 px-2.5 py-0.5 rounded-full">
-                                            {ord.tenant || 'متجر نوفا'}
-                                        </span>
-                                    </div>
+                        {orders.map((ord, idx) => {
+                            const orderNum = ord.order_number || ord.orderRef || (`#${ord.id}`);
+                            const orderDate = ord.created_at ? new Date(ord.created_at).toLocaleDateString('ar-SA') : (ord.date || '—');
+                            const tenantName = ord.tenant?.name || ord.tenant || currentTenant?.name || 'متجر نوفا';
+                            const orderTotal = ord.financials?.total ?? ord.grandTotal ?? 0;
+                            const orderCurrency = ord.financials?.currency || currency;
+                            const payMethod = ord.payment?.method || ord.paymentMethod;
+                            const city = ord.shipping?.city || ord.customer?.city || 'المملكة العربية السعودية';
+                            const address = ord.shipping?.address || ord.customer?.address || '';
+                            const items = ord.items || [];
 
-                                    <div className="flex items-center gap-2">
-                                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
-                                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                                            <span>تم الاستلام — قيد التجهيز</span>
-                                        </span>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    {ord.items?.map((it, i) => (
-                                        <div key={i} className="flex items-center justify-between text-xs py-1">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
-                                                    {it.image_url || it.images?.[0]?.url ? (
-                                                        <img src={it.image_url || it.images?.[0]?.url} alt="" className="w-full h-full object-cover" />
-                                                    ) : (
-                                                        <ShoppingBag className="w-4 h-4 text-emerald-600" />
-                                                    )}
-                                                </div>
-                                                <span className="font-bold text-slate-800">{it.name}</span>
-                                                <span className="text-slate-400 font-mono">× {it.qty}</span>
-                                            </div>
-                                            <span className="font-black text-slate-900 tabular-nums">
-                                                {(parseFloat(it.price) * it.qty).toFixed(2)} {currency}
+                            return (
+                                <div
+                                    key={orderNum || idx}
+                                    className="bg-slate-50 border border-slate-200/90 rounded-2xl p-4 sm:p-5 space-y-3 text-right"
+                                >
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/70 pb-3">
+                                        <div className="flex items-center gap-2.5">
+                                            <span className="font-mono font-black text-xs text-slate-900 bg-white border border-slate-200 px-2.5 py-1 rounded-lg">
+                                                {orderNum}
+                                            </span>
+                                            <span className="text-xs text-slate-500">{orderDate}</span>
+                                            <span className="text-xs font-bold text-emerald-800 bg-emerald-100/70 px-2.5 py-0.5 rounded-full">
+                                                {tenantName}
                                             </span>
                                         </div>
-                                    ))}
-                                </div>
 
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-3 border-t border-slate-200/70 text-xs">
-                                    <div className="text-slate-500">
-                                        التوصيل إلى: <span className="font-bold text-slate-700">{ord.customer?.city} — {ord.customer?.address}</span>
-                                        {ord.paymentMethod && (
-                                            <span className="mr-3 font-semibold text-slate-600">
-                                                (طريقة الدفع: {ord.paymentMethod === 'mada' ? 'مدى / بطاقة' : ord.paymentMethod === 'apple_pay' ? 'Apple Pay' : 'الدفع عند الاستلام'})
-                                            </span>
-                                        )}
+                                        <div className="flex items-center gap-2">
+                                            {ord.status === 'completed' ? (
+                                                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
+                                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                                    <span>مكتمل وتم الشحن والتسليم</span>
+                                                </span>
+                                            ) : ord.status === 'processing' ? (
+                                                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-full">
+                                                    <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+                                                    <span>قيد التجهيز والشحن</span>
+                                                </span>
+                                            ) : ord.status === 'cancelled' ? (
+                                                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-full">
+                                                    <span>ملغي</span>
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
+                                                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                                                    <span>تم الاستلام — قيد الانتظار</span>
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
-                                    <div className="text-slate-900 font-black text-sm">
-                                        الإجمالي: <span className="text-emerald-700 tabular-nums">{parseFloat(ord.grandTotal || 0).toFixed(2)} {currency}</span>
+
+                                    <div className="space-y-2">
+                                        {items.map((it, i) => {
+                                            const itemName = it.product_name || it.name;
+                                            const itemQty = it.quantity || it.qty || 1;
+                                            const itemPrice = it.unit_price ? parseFloat(it.unit_price) : parseFloat(it.price || 0);
+                                            const itemImage = it.product?.image_url || it.image_url || it.images?.[0]?.url;
+
+                                            return (
+                                                <div key={i} className="flex items-center justify-between text-xs py-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
+                                                            {itemImage ? (
+                                                                <img src={itemImage} alt="" className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                <ShoppingBag className="w-4 h-4 text-emerald-600" />
+                                                            )}
+                                                        </div>
+                                                        <span className="font-bold text-slate-800">{itemName}</span>
+                                                        <span className="text-slate-400 font-mono">× {itemQty}</span>
+                                                    </div>
+                                                    <span className="font-black text-slate-900 tabular-nums">
+                                                        {(itemPrice * itemQty).toFixed(2)} {orderCurrency}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-3 border-t border-slate-200/70 text-xs">
+                                        <div className="text-slate-500">
+                                            التوصيل إلى: <span className="font-bold text-slate-700">{city} {address ? `— ${address}` : ''}</span>
+                                            {payMethod && (
+                                                <span className="mr-3 font-semibold text-slate-600">
+                                                    (طريقة الدفع: {payMethod === 'mada' ? 'مدى / بطاقة' : payMethod === 'apple_pay' ? 'Apple Pay' : 'الدفع عند الاستلام'})
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="text-slate-900 font-black text-sm">
+                                            الإجمالي: <span className="text-emerald-700 tabular-nums">{parseFloat(orderTotal).toFixed(2)} {orderCurrency}</span>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </div>

@@ -3,7 +3,7 @@ import {
     LayoutDashboard, Package, Layers, Store, 
     ShieldCheck, Sparkles, User, LogOut, LogIn, 
     ChevronLeft, CheckCircle2, Building2, ShoppingBag, 
-    Sliders, Zap, ShieldAlert 
+    Sliders, Zap, ShieldAlert, ClipboardList 
 } from 'lucide-react';
 
 export default function Sidebar({
@@ -25,6 +25,13 @@ export default function Sidebar({
             label: 'لوحة التحكم',
             icon: LayoutDashboard,
             badge: null,
+            merchantOnly: true
+        },
+        {
+            id: 'orders',
+            label: 'إدارة الطلبات',
+            icon: ClipboardList,
+            badge: 'M3',
             merchantOnly: true
         },
         {

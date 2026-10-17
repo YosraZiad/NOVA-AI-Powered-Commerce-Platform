@@ -10,6 +10,7 @@ import SecurityLab from './components/SecurityLab';
 import PlatformAdminPortal from './components/PlatformAdminPortal';
 import StorefrontLayout from './components/StorefrontLayout';
 import CustomerAccount from './components/CustomerAccount';
+import OrdersManager from './components/OrdersManager';
 import DevToolsDrawer from './components/DevToolsDrawer';
 import CartDrawer from './components/CartDrawer';
 import CheckoutModal from './components/CheckoutModal';
@@ -450,6 +451,7 @@ export default function App() {
                         onNavigate={navigateTo}
                         setIsCartOpen={setIsCartOpen}
                         setIsAuthModalOpen={setIsAuthModalOpen}
+                        apiCall={apiCall}
                     />
                 </div>
             )}
@@ -584,6 +586,15 @@ export default function App() {
                                                 />
                                             )}
 
+                                            {activeView === 'orders' && (
+                                                <OrdersManager
+                                                    currentTenant={currentTenant}
+                                                    currentUser={currentUser}
+                                                    apiCall={apiCall}
+                                                    showToast={showToast}
+                                                />
+                                            )}
+
                                             {activeView === 'products' && (
                                                 <ProductCatalog
                                                     products={products}
@@ -628,6 +639,8 @@ export default function App() {
                                             <span>M1: Security Isolation</span>
                                             <span>•</span>
                                             <span>M2: Product Catalog</span>
+                                            <span>•</span>
+                                            <span>M3: Cart & Orders</span>
                                         </div>
                                     </div>
                                 </footer>
@@ -681,6 +694,7 @@ export default function App() {
                 currentTenant={currentTenant}
                 currentUser={currentUser}
                 showToast={showToast}
+                apiCall={apiCall}
             />
 
             {/* Auth Modal (Login / Register) */}

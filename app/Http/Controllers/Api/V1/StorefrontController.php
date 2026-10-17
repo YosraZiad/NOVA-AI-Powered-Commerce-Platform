@@ -3,13 +3,17 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\Order\CheckoutRequest;
 use App\Http\Resources\Api\V1\CategoryResource;
+use App\Http\Resources\Api\V1\OrderResource;
 use App\Http\Resources\Api\V1\ProductResource;
 use App\Http\Resources\Api\V1\TenantResource;
 use App\Models\Category;
+use App\Models\Order;
 use App\Models\Product;
 use App\Models\Scopes\TenantScope;
 use App\Models\Tenant;
+use App\Services\Order\CheckoutService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -111,6 +115,44 @@ class StorefrontController extends Controller
 
         return response()->json([
             'data' => CategoryResource::collection($categories),
+        ]);
+    }
+
+    /**
+     * Process checkout and place order for the active tenant.
+     */
+    public function checkout(CheckoutRequest $request, string $tenant_slug, CheckoutService $checkoutService): JsonResponse
+    {
+        $tenant = $this->getActiveTenant($tenant_slug);
+        $userId = auth('sanctum')->id();
+
+        $order = $checkoutService->placeOrder($tenant, $request->validated(), $userId);
+
+        return response()->json([
+            'message' => 'Order placed successfully.',
+            'data' => new OrderResource($order),
+        ], Response::HTTP_CREATED);
+    }
+
+    /**
+     * Retrieve public order status by order number.
+     */
+    public function order(string $tenant_slug, string $order_number): JsonResponse
+    {
+        $tenant = $this->getActiveTenant($tenant_slug);
+
+        $order = Order::withoutGlobalScope(TenantScope::class)
+            ->where('tenant_id', $tenant->id)
+            ->where('order_number', $order_number)
+            ->with(['items.product', 'tenant'])
+            ->first();
+
+        if (!$order) {
+            abort(Response::HTTP_NOT_FOUND, 'Order not found for this store.');
+        }
+
+        return response()->json([
+            'data' => new OrderResource($order),
         ]);
     }
 }

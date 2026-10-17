@@ -59,4 +59,12 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(Tenant::class, 'tenant_users')->withTimestamps();
     }
+
+    /**
+     * Orders placed by this user across stores.
+     */
+    public function orders(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Order::class);
+    }
 }

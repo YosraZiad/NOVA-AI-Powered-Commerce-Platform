@@ -1,7 +1,9 @@
 <?php
 
+use App\Http\Controllers\Api\V1\AccountOrderController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CategoryController;
+use App\Http\Controllers\Api\V1\OrderController;
 use App\Http\Controllers\Api\V1\PlatformController;
 use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\ProductImageController;
@@ -42,9 +44,17 @@ Route::prefix('v1')->group(function () {
         Route::get('/', [StorefrontController::class, 'info']);
         Route::get('products', [StorefrontController::class, 'products']);
         Route::get('categories', [StorefrontController::class, 'categories']);
+        Route::post('checkout', [StorefrontController::class, 'checkout']);
+        Route::get('orders/{order_number}', [StorefrontController::class, 'order']);
     });
 
-    // 4. Merchant & Staff Tenant-Scoped Routes (Protected by Sanctum and Tenant Context Resolution)
+    // 4. Authenticated Customer Account Routes
+    Route::prefix('account')->middleware(['auth:sanctum'])->group(function () {
+        Route::get('orders', [AccountOrderController::class, 'index']);
+        Route::get('orders/{order}', [AccountOrderController::class, 'show']);
+    });
+
+    // 5. Merchant & Staff Tenant-Scoped Routes (Protected by Sanctum and Tenant Context Resolution)
     Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
         Route::get('tenant/current', [TenantController::class, 'current']);
 
@@ -69,5 +79,10 @@ Route::prefix('v1')->group(function () {
             Route::match(['put', 'patch'], '/{variant}', [ProductVariantController::class, 'update']);
             Route::delete('/{variant}', [ProductVariantController::class, 'destroy']);
         });
+
+        // Orders Management
+        Route::apiResource('orders', OrderController::class)->only(['index', 'show']);
+        Route::patch('orders/{order}/status', [OrderController::class, 'updateStatus']);
+        Route::patch('orders/{order}/payment-status', [OrderController::class, 'updatePaymentStatus']);
     });
 });

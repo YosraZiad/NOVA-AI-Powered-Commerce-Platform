@@ -62,4 +62,12 @@ class Tenant extends Model
     {
         return $this->hasMany(Product::class);
     }
+
+    /**
+     * Orders belonging to this tenant.
+     */
+    public function orders(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Order::class);
+    }
 }
