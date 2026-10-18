@@ -1,10 +1,18 @@
+[variables]
+NPM_CONFIG_PRODUCTION = "false"
+CI = "false"
+
 [phases.setup]
 nixPkgs = ["php82", "php82Packages.composer", "nodejs_20"]
 
-[phases.build]
+[phases.install]
 cmds = [
     "composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev",
-    "npm install",
+    "npm install --include=dev"
+]
+
+[phases.build]
+cmds = [
     "npm run build"
 ]
 
