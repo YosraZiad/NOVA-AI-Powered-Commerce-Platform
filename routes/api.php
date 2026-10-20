@@ -10,6 +10,10 @@ use App\Http\Controllers\Api\V1\ProductImageController;
 use App\Http\Controllers\Api\V1\ProductVariantController;
 use App\Http\Controllers\Api\V1\StorefrontController;
 use App\Http\Controllers\Api\V1\TenantController;
+use App\Http\Controllers\Api\V1\MerchantDashboardController;
+use App\Http\Controllers\Api\V1\InventoryController;
+use App\Http\Controllers\Api\V1\MerchantCustomerController;
+use App\Http\Controllers\Api\V1\MerchantSettingsController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -84,5 +88,19 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('orders', OrderController::class)->only(['index', 'show']);
         Route::patch('orders/{order}/status', [OrderController::class, 'updateStatus']);
         Route::patch('orders/{order}/payment-status', [OrderController::class, 'updatePaymentStatus']);
+
+        // Merchant Dashboard Overview Metrics
+        Route::get('merchant/metrics', [MerchantDashboardController::class, 'metrics']);
+
+        // Inventory Management
+        Route::get('inventory', [InventoryController::class, 'index']);
+        Route::post('inventory/{product}/adjust', [InventoryController::class, 'adjust']);
+
+        // Scoped Customer Directory
+        Route::get('customers', [MerchantCustomerController::class, 'index']);
+
+        // Store Settings
+        Route::get('merchant/settings', [MerchantSettingsController::class, 'show']);
+        Route::patch('merchant/settings', [MerchantSettingsController::class, 'update']);
     });
 });

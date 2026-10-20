@@ -11,6 +11,9 @@ import PlatformAdminPortal from './components/PlatformAdminPortal';
 import StorefrontLayout from './components/StorefrontLayout';
 import CustomerAccount from './components/CustomerAccount';
 import OrdersManager from './components/OrdersManager';
+import InventoryManager from './components/InventoryManager';
+import CustomersManager from './components/CustomersManager';
+import StoreSettings from './components/StoreSettings';
 import DevToolsDrawer from './components/DevToolsDrawer';
 import CartDrawer from './components/CartDrawer';
 import CheckoutModal from './components/CheckoutModal';
@@ -582,6 +585,7 @@ export default function App() {
                                                     categories={categories}
                                                     loading={loading}
                                                     setActiveView={setActiveView}
+                                                    apiCall={apiCall}
                                                     onOpenAddProduct={() => { setEditingProduct(null); setIsProductModalOpen(true); }}
                                                 />
                                             )}
@@ -626,6 +630,35 @@ export default function App() {
                                                     loading={loading}
                                                 />
                                             )}
+
+                                            {activeView === 'inventory' && (
+                                                <InventoryManager
+                                                    currentTenant={currentTenant}
+                                                    currentUser={currentUser}
+                                                    categories={categories}
+                                                    apiCall={apiCall}
+                                                    showToast={showToast}
+                                                />
+                                            )}
+
+                                            {activeView === 'customers' && (
+                                                <CustomersManager
+                                                    currentTenant={currentTenant}
+                                                    currentUser={currentUser}
+                                                    apiCall={apiCall}
+                                                    showToast={showToast}
+                                                />
+                                            )}
+
+                                            {activeView === 'settings' && (
+                                                <StoreSettings
+                                                    currentTenant={currentTenant}
+                                                    currentUser={currentUser}
+                                                    apiCall={apiCall}
+                                                    showToast={showToast}
+                                                    onTenantUpdated={(updatedTenant) => setCurrentTenant(updatedTenant)}
+                                                />
+                                            )}
                                         </>
                                     )}
                                 </main>
@@ -641,6 +674,8 @@ export default function App() {
                                             <span>M2: Product Catalog</span>
                                             <span>•</span>
                                             <span>M3: Cart & Orders</span>
+                                            <span>•</span>
+                                            <span>M4: Merchant Admin</span>
                                         </div>
                                     </div>
                                 </footer>

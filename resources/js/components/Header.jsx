@@ -19,6 +19,9 @@ export default function Header({
         orders: { title: 'إدارة طلبات المتجر والمبيعات', breadcrumb: 'الرئيسية / الطلبات' },
         products: { title: 'كتالوج المنتجات والمخزون', breadcrumb: 'الرئيسية / المنتجات' },
         categories: { title: 'إدارة وتصنيف الكتالوج', breadcrumb: 'الرئيسية / التصنيفات' },
+        inventory: { title: 'إدارة وتتبع مستويات المخزون', breadcrumb: 'الرئيسية / المخزون' },
+        customers: { title: 'دليل عملاء وسجلات المتجر', breadcrumb: 'الرئيسية / العملاء' },
+        settings: { title: 'إعدادات وهوية المتجر وسياساته', breadcrumb: 'الرئيسية / الإعدادات' },
         security_lab: { title: 'مختبر الأمان وعزل المتاجر', breadcrumb: 'الأمان / Multi-Tenancy' }
     };
 
