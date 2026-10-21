@@ -13,8 +13,14 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             RolesAndPermissionsSeeder::class,
-            DemoDataSeeder::class,
-            ProductCatalogSeeder::class,
         ]);
+
+        // Restrict demo accounts and demo catalog to local/development/testing environments
+        if (!app()->environment('production')) {
+            $this->call([
+                DemoDataSeeder::class,
+                ProductCatalogSeeder::class,
+            ]);
+        }
     }
 }

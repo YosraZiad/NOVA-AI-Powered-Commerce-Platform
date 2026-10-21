@@ -245,7 +245,8 @@ export default function AuthModal({
                                 )}
                             </button>
 
-                            {/* Demo Quick Logins */}
+                            {/* Demo Quick Logins (Development only) */}
+                            {(import.meta?.env?.DEV || ['localhost', '127.0.0.1'].includes(window.location.hostname)) && (
                             <div className="pt-4 border-t border-slate-100">
                                 <span className="block text-[11px] font-bold text-slate-500 mb-2">تعبئة سريعة للحسابات التجريبية:</span>
                                 <div className="grid grid-cols-2 gap-2 text-[11px]">
@@ -265,6 +266,7 @@ export default function AuthModal({
                                     </button>
                                 </div>
                             </div>
+                            )}
                         </form>
                     ) : (
                         /* Mode: Register */

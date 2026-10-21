@@ -25,6 +25,13 @@ class InventoryController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $user = $request->user();
+        if (!$user?->can('inventory.view') && !$user?->hasAnyRole(['Merchant', 'Staff', 'Platform Admin'])) {
+            return response()->json([
+                'message' => 'Unauthorized. Inventory permission required.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         $tenant = $this->tenantContext->getTenant();
 
         if (!$tenant) {

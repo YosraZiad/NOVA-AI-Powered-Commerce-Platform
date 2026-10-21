@@ -25,6 +25,7 @@ class UpdateTenantSettingsRequest extends FormRequest
             'name' => ['sometimes', 'required', 'string', 'max:100'],
             'description' => ['nullable', 'string', 'max:500'],
             'logo' => ['nullable', 'string', 'max:500'],
+            'logo_url' => ['nullable', 'string', 'max:500'],
             'currency' => ['sometimes', 'required', 'string', 'in:SAR,AED,KWD,QAR,BHD,OMR,USD'],
             'settings' => ['nullable', 'array'],
             'settings.contact_email' => ['nullable', 'email', 'max:150'],

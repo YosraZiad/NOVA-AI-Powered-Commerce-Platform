@@ -42,7 +42,7 @@ export default function StoreSettings({
                 setName(tenant.name || '');
                 setDescription(tenant.description || '');
                 setCurrency(tenant.currency || 'SAR');
-                setLogoUrl(tenant.logo_url || '');
+                setLogoUrl(tenant.logo || tenant.logo_url || '');
 
                 setContactEmail(s.contact_email || '');
                 setContactPhone(s.contact_phone || '');

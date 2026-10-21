@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Tenant\UpdateTenantSettingsRequest;
 use App\Http\Resources\Api\V1\TenantResource;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 class MerchantSettingsController extends Controller
@@ -18,8 +19,15 @@ class MerchantSettingsController extends Controller
     /**
      * Display the settings for the current active tenant.
      */
-    public function show(): JsonResponse
+    public function show(Request $request): JsonResponse
     {
+        $user = $request->user();
+        if (!$user?->hasAnyRole(['Merchant', 'Platform Admin'])) {
+            return response()->json([
+                'message' => 'Unauthorized. Merchant permission required.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         $tenant = $this->tenantContext->getTenant();
 
         if (!$tenant) {
@@ -58,8 +66,9 @@ class MerchantSettingsController extends Controller
         if (array_key_exists('description', $validated)) {
             $tenant->description = $validated['description'];
         }
-        if (array_key_exists('logo', $validated)) {
-            $tenant->logo = $validated['logo'];
+        $logo = $validated['logo'] ?? $validated['logo_url'] ?? null;
+        if ($logo !== null || array_key_exists('logo', $validated) || array_key_exists('logo_url', $validated)) {
+            $tenant->logo = $logo;
         }
         if (isset($validated['currency'])) {
             $tenant->currency = $validated['currency'];

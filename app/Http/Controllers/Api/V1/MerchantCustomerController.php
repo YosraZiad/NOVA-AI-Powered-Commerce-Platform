@@ -22,6 +22,13 @@ class MerchantCustomerController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $user = $request->user();
+        if (!$user?->can('orders.view') && !$user?->hasAnyRole(['Merchant', 'Staff', 'Platform Admin'])) {
+            return response()->json([
+                'message' => 'Unauthorized. Orders permission required.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         $tenant = $this->tenantContext->getTenant();
 
         if (!$tenant) {
@@ -38,7 +45,7 @@ class MerchantCustomerController extends Controller
                 DB::raw('MAX(customer_email) as email'),
                 DB::raw('MAX(shipping_city) as city'),
                 DB::raw('COUNT(id) as total_orders'),
-                DB::raw('SUM(total) as total_spent'),
+                DB::raw("SUM(CASE WHEN status != 'cancelled' AND (payment_status = 'paid' OR status = 'completed') THEN total ELSE 0 END) as total_spent"),
                 DB::raw('MAX(created_at) as last_order_date'),
                 DB::raw('MAX(order_number) as last_order_number')
             )

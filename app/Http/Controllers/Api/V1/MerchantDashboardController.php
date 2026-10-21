@@ -24,6 +24,13 @@ class MerchantDashboardController extends Controller
      */
     public function metrics(Request $request): JsonResponse
     {
+        $user = $request->user();
+        if (!$user?->can('analytics.view') && !$user?->hasAnyRole(['Merchant', 'Staff', 'Platform Admin'])) {
+            return response()->json([
+                'message' => 'Unauthorized. Merchant permission required.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         $tenant = $this->tenantContext->getTenant();
 
         if (!$tenant) {
@@ -130,6 +137,7 @@ class MerchantDashboardController extends Controller
             $salesTrend[] = [
                 'date' => $date->format('Y-m-d'),
                 'day_name' => $date->translatedFormat('l') ?: $date->format('l'),
+                'label' => $date->translatedFormat('l') ?: $date->format('l'),
                 'revenue' => $dayRevenue,
                 'orders_count' => $orderCount,
             ];

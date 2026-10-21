@@ -21,7 +21,8 @@ class MerchantDashboardAndSettingsTest extends TestCase
     protected Tenant $tenantB;
     protected User $merchantA;
     protected User $merchantB;
-    protected User $customer;
+    protected User $staffA;
+    protected User $customerA;
 
     protected function setUp(): void
     {
@@ -41,6 +42,10 @@ class MerchantDashboardAndSettingsTest extends TestCase
         $this->merchantA->assignRole('Merchant');
         $this->tenantA->users()->attach($this->merchantA->id);
 
+        $this->staffA = User::factory()->create(['name' => 'الموظف طارق']);
+        $this->staffA->assignRole('Staff');
+        $this->tenantA->users()->attach($this->staffA->id);
+
         // Tenant B
         $this->tenantB = Tenant::factory()->create([
             'name' => 'متجر الرياض التقني',
@@ -54,9 +59,10 @@ class MerchantDashboardAndSettingsTest extends TestCase
         $this->merchantB->assignRole('Merchant');
         $this->tenantB->users()->attach($this->merchantB->id);
 
-        // Normal Customer
-        $this->customer = User::factory()->create(['name' => 'المتسوق خالد']);
-        $this->customer->assignRole('Customer');
+        // Customer associated with Tenant A
+        $this->customerA = User::factory()->create(['name' => 'المتسوق خالد']);
+        $this->customerA->assignRole('Customer');
+        $this->tenantA->users()->attach($this->customerA->id);
     }
 
     /**
@@ -66,7 +72,6 @@ class MerchantDashboardAndSettingsTest extends TestCase
     {
         $category = Category::factory()->create(['tenant_id' => $this->tenantA->id]);
 
-        // Products in Tenant A
         $p1 = Product::factory()->create([
             'tenant_id' => $this->tenantA->id,
             'category_id' => $category->id,
@@ -85,7 +90,6 @@ class MerchantDashboardAndSettingsTest extends TestCase
             'status' => 'active',
         ]);
 
-        // Orders in Tenant A
         // Completed Order with 2 units of p1
         $order1 = new Order([
             'order_number' => 'NOVA-100001',
@@ -146,7 +150,6 @@ class MerchantDashboardAndSettingsTest extends TestCase
             'line_total' => 250.00,
         ]);
 
-        // Authenticate as Merchant A
         $response = $this->actingAs($this->merchantA, 'sanctum')
             ->getJson('/api/v1/merchant/metrics', [
                 'X-Tenant-Slug' => $this->tenantA->slug,
@@ -168,6 +171,11 @@ class MerchantDashboardAndSettingsTest extends TestCase
 
         // Verify recent orders
         $response->assertJsonCount(2, 'recent_orders');
+
+        // Verify sales trend structure
+        $response->assertJsonCount(7, 'sales_trend');
+        $this->assertNotNull($response->json('sales_trend.0.label'));
+        $this->assertNotNull($response->json('sales_trend.0.day_name'));
     }
 
     /**
@@ -297,11 +305,22 @@ class MerchantDashboardAndSettingsTest extends TestCase
 
         $subFailRes->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY);
 
-        // Verify stock is still 25
+        // Verify stock remains untouched at 25
         $this->assertDatabaseHas('products', [
             'id' => $product->id,
             'stock_quantity' => 25,
         ]);
+
+        // 3. Set stock directly to 8
+        $setRes = $this->actingAs($this->merchantA, 'sanctum')
+            ->postJson("/api/v1/inventory/{$product->id}/adjust", [
+                'adjustment_type' => 'set',
+                'quantity' => 8,
+                'reason' => 'جرد فصلي معتمد',
+            ], ['X-Tenant-Slug' => $this->tenantA->slug]);
+
+        $setRes->assertStatus(Response::HTTP_OK)
+            ->assertJsonPath('product.stock_quantity', 8);
     }
 
     /**
@@ -316,7 +335,6 @@ class MerchantDashboardAndSettingsTest extends TestCase
             'stock_quantity' => 20,
         ]);
 
-        // Merchant A attempts to adjust Product B
         $response = $this->actingAs($this->merchantA, 'sanctum')
             ->postJson("/api/v1/inventory/{$productB->id}/adjust", [
                 'adjustment_type' => 'set',
@@ -365,8 +383,9 @@ class MerchantDashboardAndSettingsTest extends TestCase
             ->assertJsonPath('data.0.phone', '0551234567')
             ->assertJsonPath('data.0.email', 'faisal@example.com')
             ->assertJsonPath('data.0.city', 'حائل')
-            ->assertJsonPath('data.0.total_orders', 1)
-            ->assertJsonPath('data.0.total_spent', 517.50);
+            ->assertJsonPath('data.0.total_orders', 1);
+
+        $this->assertEquals(517.50, $response->json('data.0.total_spent'));
 
         // Assert strictly that no passwords, tokens, or credential hashes are returned
         $customerData = $response->json('data.0');
@@ -376,7 +395,65 @@ class MerchantDashboardAndSettingsTest extends TestCase
     }
 
     /**
-     * Test merchant can view and update store settings.
+     * Test cancelled orders do not inflate customer total spent.
+     */
+    public function test_cancelled_orders_do_not_inflate_customer_total_spent(): void
+    {
+        // Completed Order for 300 SAR
+        $orderGood = new Order([
+            'order_number' => 'NOVA-888881',
+            'customer_name' => 'ناصر الدوسري',
+            'customer_phone' => '0505554433',
+            'customer_email' => 'nasser@example.com',
+            'shipping_city' => 'الخرج',
+            'shipping_address' => 'حي السلام',
+            'payment_method' => 'mada',
+            'payment_status' => 'paid',
+            'status' => 'completed',
+            'subtotal' => 300.00,
+            'tax_amount' => 45.00,
+            'shipping_fee' => 0.00,
+            'discount_amount' => 0.00,
+            'total' => 345.00,
+            'currency' => 'SAR',
+        ]);
+        $orderGood->tenant_id = $this->tenantA->id;
+        $orderGood->save();
+
+        // Cancelled Order for 1,000 SAR for the same customer
+        $orderBad = new Order([
+            'order_number' => 'NOVA-888882',
+            'customer_name' => 'ناصر الدوسري',
+            'customer_phone' => '0505554433',
+            'customer_email' => 'nasser@example.com',
+            'shipping_city' => 'الخرج',
+            'shipping_address' => 'حي السلام',
+            'payment_method' => 'mada',
+            'payment_status' => 'refunded',
+            'status' => 'cancelled',
+            'subtotal' => 1000.00,
+            'tax_amount' => 150.00,
+            'shipping_fee' => 0.00,
+            'discount_amount' => 0.00,
+            'total' => 1150.00,
+            'currency' => 'SAR',
+        ]);
+        $orderBad->tenant_id = $this->tenantA->id;
+        $orderBad->save();
+
+        $response = $this->actingAs($this->merchantA, 'sanctum')
+            ->getJson('/api/v1/customers?search=0505554433', [
+                'X-Tenant-Slug' => $this->tenantA->slug,
+            ]);
+
+        $response->assertStatus(Response::HTTP_OK);
+        // Total orders is 2, but total_spent MUST only be 345 (excluding the 1150 cancelled order)
+        $this->assertEquals(2, $response->json('data.0.total_orders'));
+        $this->assertEquals(345.00, $response->json('data.0.total_spent'));
+    }
+
+    /**
+     * Test merchant can view and update store settings including logo/logo_url.
      */
     public function test_merchant_can_view_and_update_store_settings(): void
     {
@@ -389,11 +466,12 @@ class MerchantDashboardAndSettingsTest extends TestCase
         $showRes->assertStatus(Response::HTTP_OK)
             ->assertJsonPath('tenant.name', 'متجر النخبة السعودي');
 
-        // 2. Update Settings
+        // 2. Update Settings with logo_url
         $updateRes = $this->actingAs($this->merchantA, 'sanctum')
             ->patchJson('/api/v1/merchant/settings', [
                 'name' => 'متجر النخبة المحدّث',
                 'currency' => 'SAR',
+                'logo_url' => 'https://example.com/logo-elite.png',
                 'description' => 'المتجر الرائد في المملكة العربية السعودية',
                 'settings' => [
                     'contact_email' => 'support@elite-store.sa',
@@ -407,30 +485,211 @@ class MerchantDashboardAndSettingsTest extends TestCase
 
         $updateRes->assertStatus(Response::HTTP_OK)
             ->assertJsonPath('tenant.name', 'متجر النخبة المحدّث')
+            ->assertJsonPath('tenant.logo', 'https://example.com/logo-elite.png')
             ->assertJsonPath('settings.low_stock_threshold', 8)
             ->assertJsonPath('settings.contact_email', 'support@elite-store.sa');
 
         $this->assertDatabaseHas('tenants', [
             'id' => $this->tenantA->id,
             'name' => 'متجر النخبة المحدّث',
+            'logo' => 'https://example.com/logo-elite.png',
         ]);
     }
 
     /**
-     * Test unauthenticated or unauthorized users cannot access merchant dashboard APIs.
+     * Test store settings update rejects invalid currency.
      */
-    public function test_unauthenticated_or_unauthorized_user_is_denied_access_to_merchant_dashboard_apis(): void
+    public function test_store_settings_update_rejects_invalid_currency(): void
     {
-        // 1. Unauthenticated request to metrics
-        $this->getJson('/api/v1/merchant/metrics', [
-            'X-Tenant-Slug' => $this->tenantA->slug,
-        ])->assertStatus(Response::HTTP_UNAUTHORIZED);
-
-        // 2. Normal customer attempting to update store settings
-        $this->actingAs($this->customer, 'sanctum')
+        $response = $this->actingAs($this->merchantA, 'sanctum')
             ->patchJson('/api/v1/merchant/settings', [
-                'name' => 'محاولة اختراق',
-            ], ['X-Tenant-Slug' => $this->tenantA->slug])
+                'currency' => 'INVALID_CURRENCY_XYZ',
+            ], ['X-Tenant-Slug' => $this->tenantA->slug]);
+
+        $response->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)
+            ->assertJsonValidationErrors(['currency']);
+    }
+
+    /**
+     * Test unauthenticated access to all merchant APIs is rejected with 401.
+     */
+    public function test_unauthenticated_requests_are_denied_for_all_merchant_apis(): void
+    {
+        $headers = ['X-Tenant-Slug' => $this->tenantA->slug];
+
+        $this->getJson('/api/v1/merchant/metrics', $headers)->assertStatus(Response::HTTP_UNAUTHORIZED);
+        $this->getJson('/api/v1/inventory', $headers)->assertStatus(Response::HTTP_UNAUTHORIZED);
+        $this->postJson('/api/v1/inventory/1/adjust', [], $headers)->assertStatus(Response::HTTP_UNAUTHORIZED);
+        $this->getJson('/api/v1/customers', $headers)->assertStatus(Response::HTTP_UNAUTHORIZED);
+        $this->getJson('/api/v1/merchant/settings', $headers)->assertStatus(Response::HTTP_UNAUTHORIZED);
+        $this->patchJson('/api/v1/merchant/settings', [], $headers)->assertStatus(Response::HTTP_UNAUTHORIZED);
+    }
+
+    /**
+     * Test authenticated customer attached to tenant is strictly forbidden from all merchant APIs.
+     */
+    public function test_authenticated_customer_attached_to_tenant_is_forbidden_from_all_merchant_apis(): void
+    {
+        $headers = ['X-Tenant-Slug' => $this->tenantA->slug];
+
+        $category = Category::factory()->create(['tenant_id' => $this->tenantA->id]);
+        $product = Product::factory()->create([
+            'tenant_id' => $this->tenantA->id,
+            'category_id' => $category->id,
+            'stock_quantity' => 10,
+        ]);
+
+        // 1. Customer cannot access metrics
+        $this->actingAs($this->customerA, 'sanctum')
+            ->getJson('/api/v1/merchant/metrics', $headers)
             ->assertStatus(Response::HTTP_FORBIDDEN);
+
+        // 2. Customer cannot access inventory list
+        $this->actingAs($this->customerA, 'sanctum')
+            ->getJson('/api/v1/inventory', $headers)
+            ->assertStatus(Response::HTTP_FORBIDDEN);
+
+        // 3. Customer cannot adjust inventory
+        $this->actingAs($this->customerA, 'sanctum')
+            ->postJson("/api/v1/inventory/{$product->id}/adjust", [
+                'adjustment_type' => 'set',
+                'quantity' => 100,
+            ], $headers)
+            ->assertStatus(Response::HTTP_FORBIDDEN);
+
+        // 4. Customer cannot view customer directory
+        $this->actingAs($this->customerA, 'sanctum')
+            ->getJson('/api/v1/customers', $headers)
+            ->assertStatus(Response::HTTP_FORBIDDEN);
+
+        // 5. Customer cannot view store settings
+        $this->actingAs($this->customerA, 'sanctum')
+            ->getJson('/api/v1/merchant/settings', $headers)
+            ->assertStatus(Response::HTTP_FORBIDDEN);
+
+        // 6. Customer cannot update store settings
+        $this->actingAs($this->customerA, 'sanctum')
+            ->patchJson('/api/v1/merchant/settings', [
+                'name' => 'محاولة اختراق العميل',
+            ], $headers)
+            ->assertStatus(Response::HTTP_FORBIDDEN);
+    }
+
+    /**
+     * Test staff role can view metrics and inventory, but is forbidden from updating store settings.
+     */
+    public function test_staff_can_view_metrics_and_inventory_but_cannot_update_store_settings(): void
+    {
+        $headers = ['X-Tenant-Slug' => $this->tenantA->slug];
+
+        // Staff CAN view metrics
+        $this->actingAs($this->staffA, 'sanctum')
+            ->getJson('/api/v1/merchant/metrics', $headers)
+            ->assertStatus(Response::HTTP_OK);
+
+        // Staff CAN view inventory
+        $this->actingAs($this->staffA, 'sanctum')
+            ->getJson('/api/v1/inventory', $headers)
+            ->assertStatus(Response::HTTP_OK);
+
+        // Staff CAN view customers
+        $this->actingAs($this->staffA, 'sanctum')
+            ->getJson('/api/v1/customers', $headers)
+            ->assertStatus(Response::HTTP_OK);
+
+        // Staff CANNOT update store settings (only Merchant or Platform Admin can)
+        $this->actingAs($this->staffA, 'sanctum')
+            ->patchJson('/api/v1/merchant/settings', [
+                'name' => 'اسم غير مسموح للموظف',
+            ], $headers)
+            ->assertStatus(Response::HTTP_FORBIDDEN);
+    }
+
+    /**
+     * Test end-to-end integration: order placement -> inventory deduction -> metrics update -> isolation.
+     */
+    public function test_end_to_end_order_lifecycle_updates_dashboard_and_inventory(): void
+    {
+        $category = Category::factory()->create(['tenant_id' => $this->tenantA->id]);
+
+        $product = Product::factory()->create([
+            'tenant_id' => $this->tenantA->id,
+            'category_id' => $category->id,
+            'name' => 'سماعات بلوتوث ذكية',
+            'price' => 150.00,
+            'stock_quantity' => 20,
+            'status' => 'active',
+        ]);
+
+        // 1. Checkout order placed via storefront API
+        $checkoutResponse = $this->postJson("/api/v1/storefront/{$this->tenantA->slug}/checkout", [
+            'customer_name' => 'عبدالله السبيعي',
+            'customer_phone' => '0541112233',
+            'customer_email' => 'abdullah@example.com',
+            'shipping_city' => 'جدة',
+            'shipping_address' => 'حي الروضة',
+            'payment_method' => 'mada',
+            'items' => [
+                [
+                    'product_id' => $product->id,
+                    'quantity' => 4,
+                ],
+            ],
+        ]);
+
+        $checkoutResponse->assertStatus(Response::HTTP_CREATED);
+        $orderNumber = $checkoutResponse->json('order.order_number');
+
+        // 2. Verify product inventory was decremented automatically from 20 to 16
+        $this->assertDatabaseHas('products', [
+            'id' => $product->id,
+            'stock_quantity' => 16,
+        ]);
+
+        // 3. Merchant verifies dashboard overview
+        $metricsRes = $this->actingAs($this->merchantA, 'sanctum')
+            ->getJson('/api/v1/merchant/metrics', [
+                'X-Tenant-Slug' => $this->tenantA->slug,
+            ]);
+
+        $metricsRes->assertStatus(Response::HTTP_OK)
+            ->assertJsonPath('summary.total_orders', 1)
+            ->assertJsonPath('summary.total_inventory_units', 16);
+
+        // 4. Merchant verifies inventory management API
+        $invRes = $this->actingAs($this->merchantA, 'sanctum')
+            ->getJson('/api/v1/inventory?search=سماعات', [
+                'X-Tenant-Slug' => $this->tenantA->slug,
+            ]);
+
+        $invRes->assertStatus(Response::HTTP_OK)
+            ->assertJsonPath('data.0.stock_quantity', 16);
+
+        // 5. Merchant verifies customer directory
+        $custRes = $this->actingAs($this->merchantA, 'sanctum')
+            ->getJson('/api/v1/customers?search=عبدالله', [
+                'X-Tenant-Slug' => $this->tenantA->slug,
+            ]);
+
+        $custRes->assertStatus(Response::HTTP_OK)
+            ->assertJsonPath('data.0.name', 'عبدالله السبيعي')
+            ->assertJsonPath('data.0.phone', '0541112233');
+
+        // 6. Strict Isolation: Merchant B cannot see Tenant A's customer or order
+        $merchantBMetrics = $this->actingAs($this->merchantB, 'sanctum')
+            ->getJson('/api/v1/merchant/metrics', [
+                'X-Tenant-Slug' => $this->tenantB->slug,
+            ]);
+
+        $merchantBMetrics->assertStatus(Response::HTTP_OK)
+            ->assertJsonPath('summary.total_orders', 0);
+
+        $merchantBCust = $this->actingAs($this->merchantB, 'sanctum')
+            ->getJson('/api/v1/customers?search=عبدالله', [
+                'X-Tenant-Slug' => $this->tenantB->slug,
+            ]);
+
+        $merchantBCust->assertStatus(Response::HTTP_OK);
+        $this->assertCount(0, $merchantBCust->json('data'));
     }
 }
