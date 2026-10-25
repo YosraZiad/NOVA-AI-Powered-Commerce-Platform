@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import AiRecommendationsSection from './AiRecommendationsSection';
 import { 
     Search, ShoppingBag, Eye, Check, X, 
     Sparkles, ShieldCheck, Truck, CreditCard, 
@@ -498,6 +499,20 @@ export default function CustomerStorefront({
                     </div>
                 </div>
             </div>
+
+            {/* AI RECOMMENDATIONS SECTION */}
+            <AiRecommendationsSection
+                tenantSlug={currentTenant?.slug}
+                currentTenant={currentTenant}
+                intent="trending"
+                title="توصيات ذكية مختارة لك"
+                limit={4}
+                onAddToCart={handleAdd}
+                onQuickView={(p) => {
+                    setQuickViewProduct(p);
+                    setQuickViewQty(1);
+                }}
+            />
 
             {/* 7. COMPREHENSIVE PRODUCT CATALOG & FILTER SUITE */}
             <div id="store-catalog-section" className="space-y-6 pt-4">

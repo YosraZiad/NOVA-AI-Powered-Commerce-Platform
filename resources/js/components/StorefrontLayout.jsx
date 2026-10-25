@@ -6,6 +6,7 @@ import {
     Check, ArrowRight, ExternalLink, HelpCircle
 } from 'lucide-react';
 import CustomerStorefront from './CustomerStorefront';
+import StorefrontAiAssistant from './StorefrontAiAssistant';
 
 export default function StorefrontLayout({
     storeSlug,
@@ -498,6 +499,15 @@ export default function StorefrontLayout({
 
                 </div>
             </footer>
+
+            {/* 5. M5: CUSTOMER AI SHOPPING ASSISTANT */}
+            <StorefrontAiAssistant
+                tenantSlug={storeSlug}
+                currentTenant={currentTenant}
+                cart={cart}
+                onAddToCart={addToCart}
+                currentUser={currentUser}
+            />
 
         </div>
     );

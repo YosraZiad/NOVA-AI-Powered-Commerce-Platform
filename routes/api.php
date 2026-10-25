@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\PlatformController;
 use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\ProductImageController;
 use App\Http\Controllers\Api\V1\ProductVariantController;
+use App\Http\Controllers\Api\V1\StorefrontAiController;
 use App\Http\Controllers\Api\V1\StorefrontController;
 use App\Http\Controllers\Api\V1\TenantController;
 use App\Http\Controllers\Api\V1\MerchantDashboardController;
@@ -50,6 +51,13 @@ Route::prefix('v1')->group(function () {
         Route::get('categories', [StorefrontController::class, 'categories']);
         Route::post('checkout', [StorefrontController::class, 'checkout']);
         Route::get('orders/{order_number}', [StorefrontController::class, 'order']);
+
+        // M5: Customer AI Shopping Assistant & Recommendations
+        Route::prefix('ai')->group(function () {
+            Route::post('chat', [StorefrontAiController::class, 'chat'])->middleware('throttle:60,1');
+            Route::get('recommendations', [StorefrontAiController::class, 'recommendations']);
+            Route::get('conversations/{uuid}', [StorefrontAiController::class, 'conversation']);
+        });
     });
 
     // 4. Authenticated Customer Account Routes
