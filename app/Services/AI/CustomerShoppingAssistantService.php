@@ -109,6 +109,7 @@ class CustomerShoppingAssistantService
         return [
             'status' => 'success',
             'conversation_uuid' => $conversation->uuid,
+            'session_id' => $conversation->session_id,
             'reply' => $sanitizedReply,
             'message' => $sanitizedReply,
             'recommended_products' => ProductResource::collection($verifiedProducts),
@@ -156,31 +157,36 @@ class CustomerShoppingAssistantService
                 ->first();
 
             if ($conversation) {
-                // If user is authenticated, ensure conversation belongs to user if set
-                if ($user && $conversation->user_id && $conversation->user_id !== $user->id) {
+                // If conversation belongs to an authenticated user, require same user
+                if ($conversation->user_id && (!$user || $conversation->user_id !== $user->id)) {
                     abort(Response::HTTP_FORBIDDEN, 'Unauthorized access to this conversation.');
                 }
-                // If guest session is set, ensure it matches
-                if (!$user && $sessionId && $conversation->session_id && $conversation->session_id !== $sessionId) {
-                    abort(Response::HTTP_FORBIDDEN, 'Unauthorized access to this guest session.');
-                }
 
-                // Associate user if previously guest
-                if ($user && empty($conversation->user_id)) {
-                    $conversation->user_id = $user->id;
-                    $conversation->save();
+                // If conversation belongs to a guest session:
+                if (!$conversation->user_id && $conversation->session_id) {
+                    if (!$sessionId || $conversation->session_id !== $sessionId) {
+                        abort(Response::HTTP_FORBIDDEN, 'Unauthorized access to this guest session.');
+                    }
+
+                    // Associate user if user has logged in and matches this guest session
+                    if ($user) {
+                        $conversation->user_id = $user->id;
+                        $conversation->save();
+                    }
                 }
 
                 return $conversation;
             }
         }
 
-        // Create new conversation
+        // Create new conversation (ensure guest sessions have an unpredictable session ID)
+        $effectiveSessionId = $sessionId ?: (!$user ? (string) Str::uuid() : null);
+
         return AiConversation::create([
             'uuid' => (string) Str::uuid(),
             'tenant_id' => $tenant->id,
             'user_id' => $user?->id,
-            'session_id' => $sessionId,
+            'session_id' => $effectiveSessionId,
             'context' => $context,
         ]);
     }

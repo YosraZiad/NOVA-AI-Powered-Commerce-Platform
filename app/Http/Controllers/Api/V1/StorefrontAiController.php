@@ -109,12 +109,24 @@ class StorefrontAiController extends Controller
             ], Response::HTTP_NOT_FOUND);
         }
 
-        // Privacy check: If conversation belongs to an authenticated user, require same user
+        // Privacy checks:
         $currentUserId = $request->user('sanctum')?->id;
+        $sessionId = $request->input('session_id') ?? $request->header('X-Session-ID');
+
+        // 1. If conversation belongs to an authenticated user, require same user
         if ($conversation->user_id && $conversation->user_id !== $currentUserId) {
             return response()->json([
                 'message' => 'غير مصرح لك بعرض هذه المحادثة.',
             ], Response::HTTP_FORBIDDEN);
+        }
+
+        // 2. If conversation belongs to a guest session, require matching session_id
+        if (!$conversation->user_id && $conversation->session_id) {
+            if (!$sessionId || $conversation->session_id !== $sessionId) {
+                return response()->json([
+                    'message' => 'غير مصرح لك بعرض هذه المحادثة.',
+                ], Response::HTTP_FORBIDDEN);
+            }
         }
 
         // Collect all recommended product IDs across messages to hydrate ProductResources

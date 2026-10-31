@@ -81,7 +81,7 @@ class OpenAIProvider implements AIProviderInterface
                 ];
             }
 
-            Log::warning('OpenAI API request failed: ' . $response->body());
+            Log::warning('OpenAI API request failed with status: ' . $response->status());
 
             return [
                 'content' => '',
@@ -91,14 +91,14 @@ class OpenAIProvider implements AIProviderInterface
                 'error' => 'OpenAI API returned status ' . $response->status(),
             ];
         } catch (Throwable $e) {
-            Log::warning('OpenAI connection exception: ' . $e->getMessage());
+            Log::warning('OpenAI connection exception occurred during chat request.');
 
             return [
                 'content' => '',
                 'provider' => $this->getName(),
                 'model' => $this->model,
                 'status' => 'error',
-                'error' => $e->getMessage(),
+                'error' => 'Connection or timeout error while contacting OpenAI API.',
             ];
         }
     }

@@ -69,10 +69,13 @@ class GeminiProvider implements AIProviderInterface
             ],
         ];
 
-        $url = "https://generativelanguage.googleapis.com/v1beta/models/{$this->model}:generateContent?key={$this->apiKey}";
+        $url = "https://generativelanguage.googleapis.com/v1beta/models/{$this->model}:generateContent";
 
         try {
-            $response = Http::timeout($this->timeout)
+            $response = Http::withHeaders([
+                    'x-goog-api-key' => $this->apiKey,
+                ])
+                ->timeout($this->timeout)
                 ->acceptJson()
                 ->post($url, $payload);
 
@@ -89,7 +92,7 @@ class GeminiProvider implements AIProviderInterface
                 ];
             }
 
-            Log::warning('Gemini API request failed: ' . $response->body());
+            Log::warning('Gemini API request failed with status: ' . $response->status());
 
             return [
                 'content' => '',
@@ -99,14 +102,14 @@ class GeminiProvider implements AIProviderInterface
                 'error' => 'Gemini API returned status ' . $response->status(),
             ];
         } catch (Throwable $e) {
-            Log::warning('Gemini connection exception: ' . $e->getMessage());
+            Log::warning('Gemini connection exception occurred during chat request.');
 
             return [
                 'content' => '',
                 'provider' => $this->getName(),
                 'model' => $this->model,
                 'status' => 'error',
-                'error' => $e->getMessage(),
+                'error' => 'Connection or timeout error while contacting Gemini API.',
             ];
         }
     }

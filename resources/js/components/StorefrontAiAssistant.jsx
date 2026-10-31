@@ -30,6 +30,20 @@ export default function StorefrontAiAssistant({
     const currency = currentTenant?.currency || 'SAR';
     const storeName = currentTenant?.name || 'المتجر';
 
+    // Helper: Obtain or generate secure guest session ID
+    const getGuestSessionId = () => {
+        try {
+            let sid = sessionStorage.getItem('nova_guest_session_id');
+            if (!sid) {
+                sid = 'guest_' + Math.random().toString(36).substring(2, 12) + '_' + Date.now().toString(36);
+                sessionStorage.setItem('nova_guest_session_id', sid);
+            }
+            return sid;
+        } catch {
+            return 'guest_fallback_' + Date.now();
+        }
+    };
+
     // Default quick suggestion prompts
     const quickPrompts = [
         "ما هي المنتجات الأكثر طلباً في المتجر؟",
@@ -52,6 +66,29 @@ export default function StorefrontAiAssistant({
             ]);
         }
     }, [storeName]);
+
+    // Restore existing conversation if available in session
+    useEffect(() => {
+        try {
+            const savedUuid = sessionStorage.getItem(`nova_ai_active_uuid_${tenantSlug}`);
+            if (savedUuid && tenantSlug) {
+                const guestSessionId = getGuestSessionId();
+                axios.get(`/api/v1/storefront/${tenantSlug}/ai/conversations/${savedUuid}`, {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Session-ID': guestSessionId
+                    }
+                }).then(res => {
+                    if (res.data?.status === 'success' && res.data?.messages?.length > 0) {
+                        setConversationUuid(savedUuid);
+                        setMessages(res.data.messages);
+                    }
+                }).catch(() => {
+                    sessionStorage.removeItem(`nova_ai_active_uuid_${tenantSlug}`);
+                });
+            }
+        } catch {}
+    }, [tenantSlug]);
 
     // Auto-scroll to bottom of messages
     useEffect(() => {
@@ -83,6 +120,9 @@ export default function StorefrontAiAssistant({
     const handleResetChat = () => {
         setConversationUuid(null);
         setProvider(null);
+        try {
+            sessionStorage.removeItem(`nova_ai_active_uuid_${tenantSlug}`);
+        } catch {}
         setMessages([
             {
                 id: 'welcome-' + Date.now(),
@@ -112,10 +152,12 @@ export default function StorefrontAiAssistant({
         setLoading(true);
 
         try {
+            const guestSessionId = getGuestSessionId();
             // Build Context payload
             const payload = {
                 message: messageText,
                 conversation_uuid: conversationUuid,
+                session_id: guestSessionId,
                 context: {
                     current_product_id: activeProduct?.id || null,
                     cart_items: cart.map(item => ({ product_id: item.id, qty: item.qty }))
@@ -124,13 +166,17 @@ export default function StorefrontAiAssistant({
 
             const response = await axios.post(`/api/v1/storefront/${tenantSlug}/ai/chat`, payload, {
                 headers: {
-                    'Accept': 'application/json'
+                    'Accept': 'application/json',
+                    'X-Session-ID': guestSessionId
                 }
             });
 
             const data = response.data;
             if (data.conversation_uuid) {
                 setConversationUuid(data.conversation_uuid);
+                try {
+                    sessionStorage.setItem(`nova_ai_active_uuid_${tenantSlug}`, data.conversation_uuid);
+                } catch {}
             }
             if (data.provider) {
                 setProvider(data.provider);
