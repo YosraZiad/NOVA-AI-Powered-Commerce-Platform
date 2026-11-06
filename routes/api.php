@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\V1\TenantController;
 use App\Http\Controllers\Api\V1\MerchantDashboardController;
 use App\Http\Controllers\Api\V1\InventoryController;
 use App\Http\Controllers\Api\V1\MerchantCustomerController;
+use App\Http\Controllers\Api\V1\MerchantAiController;
 use App\Http\Controllers\Api\V1\MerchantSettingsController;
 use Illuminate\Support\Facades\Route;
 
@@ -110,5 +111,15 @@ Route::prefix('v1')->group(function () {
         // Store Settings
         Route::get('merchant/settings', [MerchantSettingsController::class, 'show']);
         Route::patch('merchant/settings', [MerchantSettingsController::class, 'update']);
+
+        // M6: Merchant AI Modules (Protected by Sanctum, Tenant Context, and Rate Limiting)
+        Route::prefix('merchant/ai')->middleware('throttle:60,1')->group(function () {
+            Route::get('overview', [MerchantAiController::class, 'overview']);
+            Route::post('chat', [MerchantAiController::class, 'chat']);
+            Route::post('product-content', [MerchantAiController::class, 'productContent']);
+            Route::post('marketing', [MerchantAiController::class, 'marketing']);
+            Route::get('inventory-insights', [MerchantAiController::class, 'inventoryInsights']);
+            Route::get('customer-insights', [MerchantAiController::class, 'customerInsights']);
+        });
     });
 });

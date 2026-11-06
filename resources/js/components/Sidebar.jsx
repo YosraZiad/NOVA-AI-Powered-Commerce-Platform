@@ -28,6 +28,13 @@ export default function Sidebar({
             merchantOnly: true
         },
         {
+            id: 'merchant_ai',
+            label: 'ذكاء الأعمال (AI)',
+            icon: Sparkles,
+            badge: 'M6 AI',
+            merchantOnly: true
+        },
+        {
             id: 'orders',
             label: 'إدارة الطلبات',
             icon: ClipboardList,

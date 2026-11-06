@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import MerchantDashboard from './components/MerchantDashboard';
+import MerchantAiStudio from './components/MerchantAiStudio';
 import ProductCatalog from './components/ProductCatalog';
 import ProductFormModal from './components/ProductFormModal';
 import CategoriesManager from './components/CategoriesManager';
@@ -587,6 +588,17 @@ export default function App() {
                                                     setActiveView={setActiveView}
                                                     apiCall={apiCall}
                                                     onOpenAddProduct={() => { setEditingProduct(null); setIsProductModalOpen(true); }}
+                                                />
+                                            )}
+
+                                            {activeView === 'merchant_ai' && (
+                                                <MerchantAiStudio
+                                                    currentTenant={currentTenant}
+                                                    currentUser={currentUser}
+                                                    products={products}
+                                                    categories={categories}
+                                                    apiCall={apiCall}
+                                                    showToast={showToast}
                                                 />
                                             )}
 

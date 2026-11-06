@@ -88,6 +88,14 @@ export default function MerchantDashboard({
 
                 <div className="flex items-center gap-2.5">
                     <button
+                        onClick={() => setActiveView && setActiveView('merchant_ai')}
+                        className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-slate-900 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-sm hover:opacity-95"
+                    >
+                        <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                        <span>أستوديو الذكاء الاصطناعي</span>
+                    </button>
+
+                    <button
                         onClick={fetchMetrics}
                         disabled={loading}
                         className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold transition border border-slate-200"
