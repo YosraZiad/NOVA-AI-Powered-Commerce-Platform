@@ -27,15 +27,20 @@ class OrderManagementService
                 return $order;
             }
 
-            // If cancelling an active order, restore product inventory
+            // A cancelled order is terminal; it cannot be transitioned back to active status
+            if ($currentStatus === 'cancelled' && $newStatus !== 'cancelled') {
+                throw ValidationException::withMessages([
+                    'status' => ['لا يمكن تعديل حالة طلب تم إلغاؤه مسبقاً لحماية تكامل المخزون.'],
+                ]);
+            }
+
+            // If cancelling an active order, restore product inventory atomically
             if ($newStatus === 'cancelled' && $currentStatus !== 'cancelled') {
                 $order->loadMissing('items');
                 foreach ($order->items as $item) {
-                    $product = Product::withoutGlobalScope(TenantScope::class)->find($item->product_id);
-                    if ($product) {
-                        $product->stock_quantity += $item->quantity;
-                        $product->save();
-                    }
+                    Product::withoutGlobalScope(TenantScope::class)
+                        ->where('id', $item->product_id)
+                        ->increment('stock_quantity', $item->quantity);
                 }
             }
 
